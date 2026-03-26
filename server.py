@@ -143,7 +143,7 @@ async def token(request: Request):
 
 @app.get("/.well-known/openid-configuration")
 def openid_config():
-    base_url = os.environ.get("BASE_URL", "https://your-render-url.onrender.com")
+    base_url = os.environ.get("BASE_URL", "https://copilotmcp.onrender.com")
 
     return {
         "issuer": base_url,
