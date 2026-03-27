@@ -56,7 +56,7 @@ TOOLS = {
 OAUTH_CLIENTS = {
     "copilot-client": {
         "client_secret": "secret123",
-        "redirect_uri": "https://global.consent.azure-apim.net/redirect/new-5ftpi-5f4252ad2342950ee9"
+        "redirect_uri": "https://global.consent.azure-apim.net/redirect/new-5fnewlocal-5f4252ad2342950ee9"
     }
 }
 
