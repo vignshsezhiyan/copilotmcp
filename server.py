@@ -2,14 +2,18 @@ from fastapi import FastAPI, Request
 from fastapi.responses import RedirectResponse
 import uvicorn
 import json
-import uuid
 import os
 
 app = FastAPI()
 
+# ---------------- STATIC TOKEN ----------------
+
+STATIC_ACCESS_TOKEN = "dsfdsfsdfsdfdsfdsfdsfdsf"
+
 # ---------------- TOOLS ----------------
 
 def getUser(userId: str):
+    print(f"[TOOLS] getUser called with userId={userId}")
     users = {
         "1": {"name": "vign", "email": "john@example.com"},
         "2": {"name": "Alice", "email": "alice@example.com"},
@@ -18,13 +22,12 @@ def getUser(userId: str):
 
 
 def getContacts():
+    print("[TOOLS] getContacts called")
     return [
         {"name": "David", "phone": "1234567890"},
         {"name": "Emma", "phone": "9876543210"},
     ]
 
-
-# ---------------- TOOL REGISTRY ----------------
 
 TOOLS = {
     "getUser": {
@@ -48,7 +51,7 @@ TOOLS = {
     }
 }
 
-# ---------------- STATIC OAUTH STORAGE ----------------
+# ---------------- OAUTH STATIC CONFIG ----------------
 
 OAUTH_CLIENTS = {
     "copilot-client": {
@@ -58,7 +61,6 @@ OAUTH_CLIENTS = {
 }
 
 AUTH_CODES = {}
-ACCESS_TOKENS = {}
 
 # ---------------- HELPERS ----------------
 
@@ -89,33 +91,33 @@ def mcp_error(request_id, code, message):
     }
 
 
-def get_token(request: Request):
-    auth = request.headers.get("Authorization", "")
-    return auth.replace("Bearer ", "")
-
-
 # ---------------- OAUTH ENDPOINTS ----------------
 
 @app.get("/authorize")
 def authorize(response_type: str, client_id: str, redirect_uri: str, state: str = None):
+    print("\n========== AUTHORIZE ==========")
+    print(f"client_id: {client_id}")
 
     if client_id not in OAUTH_CLIENTS:
         return {"error": "invalid_client"}
 
-    code = str(uuid.uuid4())
-
+    code = "static-auth-code"
     AUTH_CODES[code] = {"client_id": client_id}
 
     redirect_url = f"{redirect_uri}?code={code}"
     if state:
         redirect_url += f"&state={state}"
 
+    print(f"Redirecting to: {redirect_url}")
     return RedirectResponse(url=redirect_url)
 
 
 @app.post("/token")
 async def token(request: Request):
+    print("\n========== TOKEN ==========")
+
     form = await request.form()
+    print("Form Data:", dict(form))
 
     code = form.get("code")
     client_id = form.get("client_id")
@@ -130,12 +132,10 @@ async def token(request: Request):
     if code not in AUTH_CODES:
         return {"error": "invalid_code"}
 
-    access_token = str(uuid.uuid4())
-
-    ACCESS_TOKENS[access_token] = {"client_id": client_id}
+    print(f"Returning STATIC TOKEN: {STATIC_ACCESS_TOKEN}")
 
     return {
-        "access_token": access_token,
+        "access_token": STATIC_ACCESS_TOKEN,
         "token_type": "Bearer",
         "expires_in": 3600
     }
@@ -144,6 +144,8 @@ async def token(request: Request):
 @app.get("/.well-known/openid-configuration")
 def openid_config():
     base_url = os.environ.get("BASE_URL", "https://copilotmcp.onrender.com")
+
+    print("\n========== WELL-KNOWN ==========")
 
     return {
         "issuer": base_url,
@@ -160,18 +162,46 @@ def openid_config():
 @app.post("/mcp")
 async def mcp(request: Request):
 
-    body = await request.json()
+    print("\n========== MCP REQUEST START ==========")
+
+    # 🔹 HEADERS
+    headers = dict(request.headers)
+    print("\n[HEADERS]")
+    for k, v in headers.items():
+        print(f"{k}: {v}")
+
+    # 🔹 BODY
+    try:
+        body = await request.json()
+        print("\n[BODY]")
+        print(json.dumps(body, indent=2))
+    except Exception as e:
+        print("[BODY ERROR]", str(e))
+        body = {}
+
     method = body.get("method")
     request_id = body.get("id")
 
-    token = get_token(request)
+    # 🔹 TOKEN
+    auth_header = request.headers.get("Authorization", "")
+    print("\n[AUTH HEADER RAW]")
+    print(auth_header)
 
-    if token not in ACCESS_TOKENS:
+    token = auth_header.replace("Bearer ", "")
+    print("[EXTRACTED TOKEN]")
+    print(token)
+
+    # 🔹 VALIDATE TOKEN
+    if token != STATIC_ACCESS_TOKEN:
+        print("[AUTH FAILED]")
+        print("========== MCP REQUEST END ==========\n")
         return mcp_error(request_id, 403, "Invalid or missing token")
+
+    print("[AUTH SUCCESS]")
 
     # -------- initialize --------
     if method == "initialize":
-        return {
+        response = {
             "jsonrpc": "2.0",
             "id": request_id,
             "result": {
@@ -184,11 +214,13 @@ async def mcp(request: Request):
             }
         }
 
+        print("[RESPONSE]", json.dumps(response, indent=2))
+        print("========== MCP REQUEST END ==========\n")
+        return response
+
     # -------- tools/list --------
     elif method == "tools/list":
-
         tools = []
-
         for name, tool in TOOLS.items():
             tools.append({
                 "name": name,
@@ -196,38 +228,43 @@ async def mcp(request: Request):
                 "inputSchema": tool["schema"]
             })
 
-        return {
+        response = {
             "jsonrpc": "2.0",
             "id": request_id,
-            "result": {
-                "tools": tools
-            }
+            "result": {"tools": tools}
         }
+
+        print("[RESPONSE]", json.dumps(response, indent=2))
+        print("========== MCP REQUEST END ==========\n")
+        return response
 
     # -------- tools/call --------
     elif method == "tools/call":
-
         params = body.get("params", {})
         tool_name = params.get("name")
         args = params.get("arguments", {})
 
-        tool = TOOLS.get(tool_name)
+        print(f"[TOOL CALL] {tool_name}")
+        print(f"[ARGS] {args}")
 
+        tool = TOOLS.get(tool_name)
         if not tool:
             return mcp_error(request_id, -32601, "Tool not found")
 
         try:
-            handler = tool["handler"]
+            result = tool["handler"](**args) if args else tool["handler"]()
+            response = mcp_result(request_id, result)
 
-            if args:
-                result = handler(**args)
-            else:
-                result = handler()
-
-            return mcp_result(request_id, result)
+            print("[RESPONSE]", json.dumps(response, indent=2))
+            print("========== MCP REQUEST END ==========\n")
+            return response
 
         except Exception as e:
+            print("[ERROR]", str(e))
             return mcp_error(request_id, 500, str(e))
+
+    print("[UNKNOWN METHOD]")
+    print("========== MCP REQUEST END ==========\n")
 
     return mcp_error(request_id, -32600, "Unknown method")
 
@@ -236,4 +273,5 @@ async def mcp(request: Request):
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
+    print(f"[SERVER START] Running on port {port}")
     uvicorn.run(app, host="0.0.0.0", port=port)
