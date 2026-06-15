@@ -56,7 +56,7 @@ TOOLS = {
 OAUTH_CLIENTS = {
     "copilot-client": {
         "client_secret": "secret123",
-        "redirect_uri": "https://chatgpt.com/connector/oauth/E5mJKXv2o4oL"
+        "redirect_uri": "https://chatgpt.com/connector/oauth/oBySWhMBHnV_"
     }
 }
 
