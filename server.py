@@ -143,7 +143,7 @@ async def token(request: Request):
 
 @app.get("/.well-known/openid-configuration")
 def openid_config():
-    base_url = os.environ.get("BASE_URL", "https://copilotmcp.onrender.com")
+    base_url = os.environ.get("BASE_URL", "https://copilotmcp-b3jh.onrender.com")
 
     print("\n========== WELL-KNOWN ==========")
 
