@@ -33,6 +33,11 @@ TOOLS = {
     "getUser": {
         "handler": getUser,
         "description": "Get user by id",
+        "annotations": {
+            "readOnlyHint": True,
+            "openWorldHint": False,
+            "destructiveHint": False
+        },
         "schema": {
             "type": "object",
             "properties": {
@@ -41,9 +46,15 @@ TOOLS = {
             "required": ["userId"]
         }
     },
+
     "getContacts": {
         "handler": getContacts,
         "description": "List all contacts",
+        "annotations": {
+            "readOnlyHint": True,
+            "openWorldHint": False,
+            "destructiveHint": False
+        },
         "schema": {
             "type": "object",
             "properties": {}
@@ -225,7 +236,8 @@ async def mcp(request: Request):
             tools.append({
                 "name": name,
                 "description": tool["description"],
-                "inputSchema": tool["schema"]
+                "inputSchema": tool["schema"],
+                "annotations": tool["annotations"]
             })
 
         response = {
