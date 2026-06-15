@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import RedirectResponse
+from fastapi.responses import PlainTextResponse
 import uvicorn
 import json
 import os
@@ -151,7 +152,12 @@ async def token(request: Request):
         "expires_in": 3600
     }
 
-
+@app.get("/.well-known/openai-apps-challenge")
+def openai_apps_challenge():
+    return PlainTextResponse(
+        "lD7g2KFyreHWdyekVRF450fnQszO6dzTFxdlK0cTtkk"
+    )
+    
 @app.get("/.well-known/openid-configuration")
 def openid_config():
     base_url = os.environ.get("BASE_URL", "https://copilotmcp-b3jh.onrender.com")
